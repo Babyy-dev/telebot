@@ -1,0 +1,19 @@
+[Unit]
+Description=Telegram Referral Job Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/opt/referral-bot
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/opt/referral-bot/.env
+ExecStart=/opt/referral-bot/.venv/bin/python /opt/referral-bot/main.py
+Restart=always
+RestartSec=15
+StandardOutput=append:/opt/referral-bot/bot.log
+StandardError=append:/opt/referral-bot/bot.log
+
+[Install]
+WantedBy=multi-user.target

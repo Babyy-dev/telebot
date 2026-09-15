@@ -1,0 +1,8 @@
+.env
+*.session
+*.session-journal
+referrals.db
+bot.log
+__pycache__/
+.venv/
+venv/
