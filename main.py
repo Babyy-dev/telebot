@@ -19,11 +19,8 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger(__name__)
-
-
-def _message_text(event: events.NewMessage.Event) -> str:
-    msg = event.message
-    return (msg.message or getattr(msg, "raw_text", None) or "").strip()
+RECENT_LIMIT = 20
+MAX_CATCHUP_ALERTS = 5
 
 
 def _require_session(path: Path) -> None:
@@ -43,18 +40,17 @@ async def _require_authorized(client: TelegramClient) -> None:
         )
 
 
-async def handle_message(
-    event: events.NewMessage.Event,
+async def process_text(
     client: TelegramClient,
     settings: Settings,
-) -> None:
-    text = _message_text(event)
+    channel_id: str,
+    text: str,
+) -> bool:
+    text = (text or "").strip()
     if len(text) < 20:
-        return
-
-    channel_id = str(event.chat_id)
+        return False
     if await is_seen(channel_id, text):
-        return
+        return False
 
     job = parse_job_message(text)
     result = job_matches_filters(job, settings)
@@ -62,11 +58,37 @@ async def handle_message(
 
     if not result.matched:
         logger.info("Skipped: %s", job.title_hint or text[:60].replace("\n", " "))
-        return
+        return False
 
     alert = build_alert_message(job, result.matched_via, your_name=settings.your_name)
     await notify(client, settings, alert)
     logger.info("Alert sent: %s", job.title_hint or text[:60].replace("\n", " "))
+    return True
+
+
+async def handle_message(
+    event: events.NewMessage.Event,
+    client: TelegramClient,
+    settings: Settings,
+) -> None:
+    msg = event.message
+    text = (msg.message or getattr(msg, "raw_text", None) or "").strip()
+    await process_text(client, settings, str(event.chat_id), text)
+
+
+async def scan_recent(client: TelegramClient, settings: Settings) -> None:
+    sent = 0
+    for chat in settings.monitor_channels:
+        async for message in client.iter_messages(chat, limit=RECENT_LIMIT):
+            if sent >= MAX_CATCHUP_ALERTS:
+                return
+            text = (message.message or "").strip()
+            try:
+                if await process_text(client, settings, str(message.chat_id), text):
+                    sent += 1
+            except Exception:
+                logger.exception("Failed to process recent message")
+    logger.info("Recent scan finished (%s alerts)", sent)
 
 
 async def run_bot() -> None:
@@ -113,11 +135,17 @@ async def run_bot() -> None:
             "Referral bot is running.\n\n"
             f"Watching:\n" + "\n".join(f"• {n}" for n in names) + "\n\n"
             "Filters: intern/trainee OR remote\n"
-            "You will get alerts here when a matching job is posted.",
+            "Keep this running (or put it on VPS) to get new job alerts.\n"
+            "Scanning last few posts now...",
         )
         logger.info("Startup ping sent to %s", settings.alert_chat_id)
     except Exception:
         logger.exception("Could not send startup ping — check ALERT_CHAT_ID")
+
+    try:
+        await scan_recent(client, settings)
+    except Exception:
+        logger.exception("Recent scan failed")
 
     await client.run_until_disconnected()
 
@@ -128,7 +156,7 @@ async def main() -> None:
             await run_bot()
         except SystemExit:
             raise
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, asyncio.CancelledError):
             logger.info("Stopped")
             return
         except Exception:
@@ -140,4 +168,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        print("Stopped")
