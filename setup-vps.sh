@@ -13,6 +13,15 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
+if [[ ! -f "$SRC_DIR/.env" ]]; then
+  echo "Missing $SRC_DIR/.env"
+  echo "Hidden files like .env are often skipped by scp. From your laptop run:"
+  echo "  scp /Users/babyyy/Documents/new/telebot/.env USER@VPS:~/telebot/.env"
+  echo "  scp /Users/babyyy/Documents/new/telebot/referral_bot.session USER@VPS:~/telebot/"
+  echo "Then on VPS: cd ~/telebot && sudo bash setup-vps.sh"
+  exit 1
+fi
+
 echo "==> Installing packages..."
 apt-get update -qq
 apt-get install -y python3 python3-venv python3-pip rsync

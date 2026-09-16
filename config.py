@@ -35,6 +35,7 @@ class Settings:
     api_hash: str
     monitor_channels: list[int | str]
     alert_chat_id: int
+    bot_token: str | None = None
     whatsapp_phone: str | None
     callmebot_api_key: str | None
     sms_to: str | None = None
@@ -62,6 +63,7 @@ class Settings:
             api_hash=api_hash,
             monitor_channels=monitor_channels,
             alert_chat_id=int(alert_chat_id),
+            bot_token=(os.getenv("TELEGRAM_BOT_TOKEN") or "").strip() or None,
             whatsapp_phone=os.getenv("WHATSAPP_PHONE"),
             callmebot_api_key=os.getenv("CALLMEBOT_API_KEY"),
             sms_to=os.getenv("SMS_TO"),

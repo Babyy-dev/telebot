@@ -21,8 +21,27 @@ def _chunks(text: str, size: int = MAX_TELEGRAM_LEN) -> list[str]:
 
 
 async def send_telegram_alert(client: TelegramClient, settings: Settings, message: str) -> None:
+    if settings.bot_token:
+        await _send_via_bot(settings, message)
+        return
     for chunk in _chunks(message):
         await client.send_message(settings.alert_chat_id, chunk)
+
+
+async def _send_via_bot(settings: Settings, message: str) -> None:
+    url = f"https://api.telegram.org/bot{settings.bot_token}/sendMessage"
+    async with httpx.AsyncClient(timeout=20) as http:
+        for chunk in _chunks(message):
+            response = await http.post(
+                url,
+                json={
+                    "chat_id": settings.alert_chat_id,
+                    "text": chunk,
+                    "disable_notification": False,
+                },
+            )
+            if response.status_code != 200:
+                logger.warning("Bot alert failed: %s", response.text[:300])
 
 
 async def send_whatsapp_alert(settings: Settings, message: str) -> None:
