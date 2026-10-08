@@ -36,8 +36,8 @@ class Settings:
     monitor_channels: list[int | str]
     alert_chat_id: int
     bot_token: str | None = None
-    whatsapp_phone: str | None
-    callmebot_api_key: str | None
+    whatsapp_phone: str | None = None
+    callmebot_api_key: str | None = None
     sms_to: str | None = None
     fast2sms_api_key: str | None = None
     filter_roles: list[str] = field(default_factory=list)
